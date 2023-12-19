@@ -1,0 +1,11 @@
+POST http://localhost:1200/login
+Content-Type: application/json
+
+{
+    "username" : "AdminMenkor",
+    "password" : "AdminMenkor1."
+}
+
+###
+GET http://localhost:1200/verify
+Authorization: Bearer aaahbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJBZG1pbk1lbmtvciIsInJvbGVfaWQiOjEsImlkZW50aXRhcyI6MSwiaWF0IjoxNzAyNTYwOTE0LCJleHAiOjE3MDI1NjgxMTR9.M-dmFXnvPQ8IdUXC5RU6bZ2vHcTX_WenmD4UZ3FoOIM
