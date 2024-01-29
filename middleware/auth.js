@@ -12,8 +12,18 @@ const Auth = {
         console.log('Youre not authenticated');
       }
       req.user = user
+      console.log(`${req.route.path} - ${req.user.username} doing Token Verification`)
       next()
     })
+  },
+  verifyAdmin(req, res, next) {
+    if (req.user.role_id == 1) {
+      console.log(`${req.route.path} - ${req.user.username} doing Admin Verification`)
+      next()
+    }
+    else {
+      res.status(401).send("You're not authorized")
+    }
   }
 }
 
