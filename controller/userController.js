@@ -58,6 +58,15 @@ const jabatans = async (req, res, next) => {
     }
 }
 
+const dds = async (req, res, next) => {
+    try {
+        var result = await Services.dds()
+        res.status(result.code).send(result.hasil)
+    } catch (error) {
+        return res.status(500).send("Gangguan server")
+    }
+}
+
 const myKadet = async (req, res, next) => {
     try {
         var cek = await Services.cekKadet(req.user.id)
@@ -151,15 +160,15 @@ const tambahJabatan = async (req, res, next) => {
         return res.status(500).send("Gangguan server")
     }
 }
-/*
-const tambahKadet = async (req, res, next) => {
+
+const tambahDD = async (req, res, next) => {
     try {
-        console.log(req)
-        res.status(200).send("ok")
+        var dd = await Services.tambahDD(req.body.jenis_jabatan, req.body.tingkat, req.body.yurisdiksi, req.body.nama_dd, req.body.jk)
+        res.status(dd.code).send('Berhasil tambah dinas dalam')
     } catch (error) {
         return res.status(500).send("Gangguan server")
     }
-}*/
+}
 module.exports = {
     login,
     verify,
@@ -174,5 +183,7 @@ module.exports = {
     editKadet,
     tambahJabatan,
     jabatans,
-    assignJabatan
+    assignJabatan,
+    tambahDD,
+    dds
 }

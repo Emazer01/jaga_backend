@@ -24,11 +24,15 @@ router.post('/tambahAkun', Auth.verifyToken, Auth.verifyAdmin, Validation.regist
 
 router.post('/tambahJabatan', Auth.verifyToken, Auth.verifyAdmin, userController.tambahJabatan)
 
+router.post('/tambahDD', Auth.verifyToken, Auth.verifyAdmin, userController.tambahDD)
+
 router.put('/changePassword', Auth.verifyToken, userController.changePassword)
 
 router.put('/editKadet', Auth.verifyToken, userController.editKadet)
 
 router.get('/jabatans', Auth.verifyToken, userController.jabatans)
+
+router.get('/dds', Auth.verifyToken, userController.dds)
 
 router.put('/assignJabatan', Auth.verifyToken, Auth.verifyAdmin, userController.assignJabatan)
 
