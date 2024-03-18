@@ -36,4 +36,16 @@ router.get('/dds', Auth.verifyToken, userController.dds)
 
 router.put('/assignJabatan', Auth.verifyToken, Auth.verifyAdmin, userController.assignJabatan)
 
+router.put('/assignDinas', Auth.verifyToken, Auth.verifyAdmin, userController.assignDinas)
+
+router.get('/wewenang', Auth.verifyToken, userController.wewenang)
+
+router.post('/dataApel', Auth.verifyToken, userController.dataApel)
+
+router.get('/listLapApel', Auth.verifyToken, userController.listLapApel)
+
+router.post('/lapApel', Auth.verifyToken, userController.lapApel)
+
+router.get('/apel', Auth.verifyToken, userController.apel)
+
 module.exports = router
