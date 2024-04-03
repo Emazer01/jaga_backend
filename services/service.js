@@ -53,39 +53,9 @@ const forward = {
     `
 }
 
-const login = async (username, password) => {
-    try {
-        const query = `SELECT * FROM akun WHERE username=$1`
-        const user = await db.query(query, [username])
-        if (!user.rows[0]) return ({
-            code: 404,
-            message: 'Username tidak ditemukan'
-        })
-        var hash = user.rows[0]['user_pass']
-        var hasil = await bcrypt.compare(password, hash)
-        if (hasil == true) {
-            // 10. Generate token menggunakan jwt sign
-            let data = {
-                id: user.rows[0]['akun_id'],
-                username: user.rows[0]['username'],
-                role_id: user.rows[0]['role_id']
-            }
-            const token = jwt.sign(data, process.env.SECRET /*, { expiresIn: '2h' }*/);
-
-            return ({
-                code: 200,
-                message: token
-            })
-        } else {
-            return ({
-                code: 401,
-                message: 'Password salah'
-            })
-        }
-    } catch (error) {
-        return (error.message);
-    }
-}
+//==============================================================================//
+//============================== SELECT NO PARAMS ==============================//
+//==============================================================================//
 
 const accounts = async () => {
     try {
@@ -264,6 +234,267 @@ const dds = async () => {
     }
 }
 
+const atribut = async () => {
+    try {
+        const query = `SELECT * FROM pangkat`
+        const hasil = await db.query(query)
+        const query2 = `SELECT pleton_id, pleton_nama, k.kompi_id, kompi_nama, b.batalyon_id, batalyon_nama FROM pleton AS p LEFT JOIN kompi AS k ON p.kompi_id=k.kompi_id LEFT JOIN batalyon AS b ON k.batalyon_id=b.batalyon_id`
+        const hasil2 = await db.query(query2)
+        return ({
+            code: 200,
+            message: {
+                pangkat: hasil.rows,
+                pleton: hasil2.rows
+            }
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+//====================================================================//
+//============================== INSERT ==============================//
+//====================================================================//
+
+const register = async (username, user_pass, role_id) => {
+    try {
+        const hash = await bcrypt.hash(user_pass, 10)
+        const query = `INSERT INTO akun(username, user_pass, role_id, status_id) values($1, $2, $3, 2) returning akun_id;`
+        const hasil = await db.query(query, [username, hash, role_id]);
+        return ({
+            code: 200,
+            akun_id: hasil.rows[0].akun_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const foto = async (fotoUrl) => {
+    try {
+        const query = `INSERT INTO foto(foto_isi) values($1) returning foto_id;`
+        const hasil = await db.query(query, [fotoUrl]);
+        return ({
+            code: 200,
+            foto_id: hasil.rows[0].foto_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const tambahKadet = async (kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk, angkatan) => {
+    try {
+        const query = `INSERT INTO kadet(kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jenis_kelamin, angkatan) values($1, $2, $3, $4, $5, $6, $7, $8, $9) returning kadet_id;`
+        const hasil = await db.query(query, [kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk, angkatan]);
+        return ({
+            code: 200,
+            kadet_id: hasil.rows[0].kadet_id,
+            message: 'success'
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const tambahJabatan = async (jenis_jabatan, tingkat, yurisdiksi, nama_jabatan) => {
+    try {
+        const query = `INSERT INTO jabatan_${tingkat}(jabatan_${tingkat}_nama, status_id, jenis_jabatan_id, ${tingkat}_id) values($1, 2, $2, $3) returning jabatan_${tingkat}_id;`
+        const hasil = await db.query(query, [nama_jabatan, jenis_jabatan, yurisdiksi]);
+        return ({
+            code: 200,
+            hasil: hasil.rows[0],
+            message: 'success'
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const tambahDD = async (jenis_jabatan, tingkat, yurisdiksi, nama_dd, jk) => {
+    try {
+        const query = `INSERT INTO dd_${tingkat}(dd_${tingkat}_nama, status_id, jenis_jabatan_id, ${tingkat}_id, jenis_kelamin) values($1, 2, $2, $3, $4) returning dd_${tingkat}_id;`
+        const hasil = await db.query(query, [nama_dd, jenis_jabatan, yurisdiksi, jk]);
+        return ({
+            code: 200,
+            hasil: hasil.rows[0],
+            message: 'success'
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const logKeterangan = async (keterangan_id, kadet_id) => {
+    try {
+        const query = `INSERT INTO log_keterangan(log_ket_date, keterangan_id, kadet_id) values(now(), $1, $2) returning log_ket_id;`
+        const hasil = await db.query(query, [keterangan_id, kadet_id]);
+        return ({
+            code: 200,
+            log_ket_id: hasil.rows[0].log_ket_id,
+            message: "success"
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const lapApel = async (tingkat, yurisdiksi_id, pelapor_kadet_id, jenis_apel_id) => {
+    try {
+        const query = `
+        INSERT INTO apel_${tingkat} (
+            apel_${singkat[tingkat]}_date,
+            ${tingkat}_id,
+            pelapor_kadet_id,
+            jenis_apel_id, 
+            editable) 
+        SELECT 
+            now(),
+            $1,
+            $2,
+            $3,
+            $4
+        WHERE not exists (select apel_${singkat[tingkat]}_date, jenis_apel_id from apel_${tingkat} ap where date_trunc('day',apel_${singkat[tingkat]}_date) = date_trunc('day', now()) and jenis_apel_id = $3 and ${tingkat}_id = $1) 
+        returning apel_${singkat[tingkat]}_id AS lap_apel_id;`
+        const hasil = await db.query(query, [yurisdiksi_id, pelapor_kadet_id, jenis_apel_id, 1]);
+        if (!hasil.rows[0]) {
+            return ({
+                code: 500,
+                message: 'Error Insert'
+            })
+        }
+        return ({
+            code: 200,
+            lap_apel_id: hasil.rows[0].lap_apel_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const sakit = async (kadet_id, sakit, detail_sakit, foto_id) => {
+    try {
+        const query = `
+        INSERT INTO sakit(
+            kadet_id,
+            sakit_nama,
+            sakit_date,
+            sakit_detail,
+            foto_id
+        ) VALUES (
+            $1, $2, now(), $3, $4
+        ) RETURNING sakit_id;`
+        const hasil = await db.query(query, [kadet_id, sakit, detail_sakit, foto_id]);
+        return ({
+            code: 200,
+            sakit_id: hasil.rows[0].sakit_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const izin = async (kadet_id, izin, detail_izin, foto_id) => {
+    try {
+        const query = `
+        INSERT INTO izin(
+            kadet_id,
+            izin_nama,
+            izin_date,
+            izin_detail,
+            foto_id
+        ) VALUES (
+            $1, $2, now(), $3, $4
+        ) RETURNING izin_id;`
+        const hasil = await db.query(query, [kadet_id, izin, detail_izin, foto_id]);
+        return ({
+            code: 200,
+            izin_id: hasil.rows[0].izin_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const dataApel = async (keterangan_id, kadet_id, apel_ton_id, sakit_id, izin_id) => {
+    try {
+        const query = `
+        INSERT INTO data_apel(
+            keterangan_id,
+            kadet_id,
+            apel_ton_id,
+            sakit_id,
+            izin_id
+        ) VALUES (
+            $1, $2, $3, $4, $5
+        );`
+        const hasil = await db.query(query, [keterangan_id, kadet_id, apel_ton_id, sakit_id, izin_id])
+        return ({
+            code: 200,
+            message: 'Berhasil'
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const forwardApel = async (tingkat, tingkat_subordinates, apel_tingkat_id, apel_subordinates_id) => {
+    try {
+        const query = `
+        INSERT INTO ${singkat[tingkat_subordinates]}_${singkat[tingkat]}(
+            apel_${singkat[tingkat_subordinates]}_id,
+            apel_${singkat[tingkat]}_id
+        ) VALUES (
+            $1, $2
+        );`
+        const hasil = await db.query(query, [apel_subordinates_id, apel_tingkat_id])
+        return ({
+            code: 200,
+            message: 'Berhasil'
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+//================================================================================//
+//============================== SELECT WITH PARAMS ==============================//
+//================================================================================//
+
+const login = async (username, password) => {
+    try {
+        const query = `SELECT * FROM akun WHERE username=$1`
+        const user = await db.query(query, [username])
+        if (!user.rows[0]) return ({
+            code: 404,
+            message: 'Username tidak ditemukan'
+        })
+        var hash = user.rows[0]['user_pass']
+        var hasil = await bcrypt.compare(password, hash)
+        if (hasil == true) {
+            // 10. Generate token menggunakan jwt sign
+            let data = {
+                id: user.rows[0]['akun_id'],
+                username: user.rows[0]['username'],
+                role_id: user.rows[0]['role_id']
+            }
+            const token = jwt.sign(data, process.env.SECRET /*, { expiresIn: '2h' }*/);
+
+            return ({
+                code: 200,
+                message: token
+            })
+        } else {
+            return ({
+                code: 401,
+                message: 'Password salah'
+            })
+        }
+    } catch (error) {
+        return (error.message);
+    }
+}
+
 const cekKadet = async (akun_id) => {
     try {
         const query = `SELECT kadet_nim, kadet_id FROM kadet AS k LEFT JOIN akun AS a ON k.akun_id = a.akun_id WHERE a.akun_id=$1`
@@ -334,202 +565,6 @@ const kadet = async (kadet_nim) => {
             message: user.rows[0]
         })
     } catch (error) {
-        return (error.message);
-    }
-}
-
-const atribut = async () => {
-    try {
-        const query = `SELECT * FROM pangkat`
-        const hasil = await db.query(query)
-        const query2 = `SELECT pleton_id, pleton_nama, k.kompi_id, kompi_nama, b.batalyon_id, batalyon_nama FROM pleton AS p LEFT JOIN kompi AS k ON p.kompi_id=k.kompi_id LEFT JOIN batalyon AS b ON k.batalyon_id=b.batalyon_id`
-        const hasil2 = await db.query(query2)
-        return ({
-            code: 200,
-            message: {
-                pangkat: hasil.rows,
-                pleton: hasil2.rows
-            }
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const register = async (username, user_pass, role_id) => {
-    try {
-        const hash = await bcrypt.hash(user_pass, 10)
-        const query = `INSERT INTO akun(username, user_pass, role_id, status_id) values($1, $2, $3, 2) returning akun_id;`
-        const hasil = await db.query(query, [username, hash, role_id]);
-        return ({
-            code: 200,
-            akun_id: hasil.rows[0].akun_id
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const changePassword = async (akun_id, newpassword) => {
-    try {
-        const hash = await bcrypt.hash(newpassword, 10)
-        const query = `UPDATE akun SET user_pass = $1 WHERE akun_id = $2`
-        const hasil = await db.query(query, [hash, akun_id]);
-        return ({
-            code: 200,
-            message: hasil
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const assignJabatan = async (tingkat, jabatan_id, kadet_id) => {
-    try {
-        const query = `UPDATE jabatan_${tingkat} SET kadet_id = $1 WHERE jabatan_${tingkat}_id = $2 RETURNING jabatan_${tingkat}_id AS jabatan_id`
-        const hasil = await db.query(query, [kadet_id, jabatan_id]);
-        const query2 = `INSERT INTO log_jab_${singkat[tingkat]}(log_jab_${singkat[tingkat]}_date, jabatan_${tingkat}_id, kadet_id) VALUES(now(), $1, $2) RETURNING log_jab_${singkat[tingkat]}_id`
-        console.log(query2)
-        const hasil2 = await db.query(query2, [hasil.rows[0].jabatan_id, kadet_id]);
-        return ({
-            code: 200,
-            message: hasil2
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const assignDinas = async (tingkat, dinas_id, kadet_id) => {
-    try {
-        const query = `UPDATE dd_${tingkat} SET kadet_id = $1 WHERE dd_${tingkat}_id = $2 RETURNING dd_${tingkat}_id AS dinas_id`
-        const hasil = await db.query(query, [kadet_id, dinas_id]);
-        const query2 = `INSERT INTO log_dd_${singkat[tingkat]}(log_dd_${singkat[tingkat]}_date, dd_${tingkat}_id, kadet_id) VALUES(now(), $1, $2) RETURNING log_dd_${singkat[tingkat]}_id`
-        console.log(query2)
-        const hasil2 = await db.query(query2, [hasil.rows[0].dinas_id, kadet_id]);
-        return ({
-            code: 200,
-            message: hasil2
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const foto = async (fotoUrl) => {
-    try {
-        console.log('sampe foto')
-        const query = `INSERT INTO foto(foto_isi) values($1) returning foto_id;`
-        const hasil = await db.query(query, [fotoUrl]);
-        return ({
-            code: 200,
-            foto_id: hasil.rows[0].foto_id
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const tambahKadet = async (kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk, angkatan) => {
-    console.log(kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk)
-    try {
-        const query = `INSERT INTO kadet(kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jenis_kelamin, angkatan) values($1, $2, $3, $4, $5, $6, $7, $8, $9) returning kadet_id;`
-        const hasil = await db.query(query, [kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk, angkatan]);
-        console.log(hasil)
-        return ({
-            code: 200,
-            kadet_id: hasil.rows[0].kadet_id,
-            message: 'success'
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const tambahJabatan = async (jenis_jabatan, tingkat, yurisdiksi, nama_jabatan) => {
-    try {
-        const query = `INSERT INTO jabatan_${tingkat}(jabatan_${tingkat}_nama, status_id, jenis_jabatan_id, ${tingkat}_id) values($1, 2, $2, $3) returning jabatan_${tingkat}_id;`
-        const hasil = await db.query(query, [nama_jabatan, jenis_jabatan, yurisdiksi]);
-        return ({
-            code: 200,
-            hasil: hasil.rows[0],
-            message: 'success'
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const tambahDD = async (jenis_jabatan, tingkat, yurisdiksi, nama_dd, jk) => {
-    try {
-        const query = `INSERT INTO dd_${tingkat}(dd_${tingkat}_nama, status_id, jenis_jabatan_id, ${tingkat}_id, jenis_kelamin) values($1, 2, $2, $3, $4) returning dd_${tingkat}_id;`
-        const hasil = await db.query(query, [nama_dd, jenis_jabatan, yurisdiksi, jk]);
-        return ({
-            code: 200,
-            hasil: hasil.rows[0],
-            message: 'success'
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const editKadet = async (kadet_nim, kadet_nama, pleton_id, pangkat_id, akun_id, jenis_kelamin, angkatan) => {
-    try {
-        const query = `UPDATE kadet SET kadet_nim = $1, kadet_nama=$2, pleton_id=$3, pangkat_id=$4, jenis_kelamin=$5, angkatan=$6 WHERE akun_id = $7 RETURNING foto_id`
-        const hasil = await db.query(query, [kadet_nim, kadet_nama, pleton_id, pangkat_id, jenis_kelamin, angkatan, akun_id]);
-        //console.log(hasil)
-        return ({
-            code: 200,
-            foto_id: hasil.rows[0].foto_id
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const editFoto = async (foto_id, foto_isi) => {
-    try {
-        const query = `UPDATE foto SET foto_isi = $1 WHERE foto_id = $2`
-        const hasil = await db.query(query, [foto_isi, foto_id]);
-        return ({
-            code: 200,
-            message: 'success'
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const rollbackTambahKadet = async (foto_id, akun_id) => {
-    try {
-        const query = `DELETE FROM akun WHERE akun_id=$1`
-        const hasil = await db.query(query, [akun_id]);
-        const query2 = `DELETE FROM foto WHERE foto_id=$1`
-        const hasil2 = await db.query(query2, [foto_id]);
-        return ({
-            code: 400,
-            message: 'Gagal tambah kadet'
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const logKeterangan = async (keterangan_id, kadet_id) => {
-    try {
-        console.log("sampai service log")
-        console.log(keterangan_id, kadet_id);
-        const query = `INSERT INTO log_keterangan(log_ket_date, keterangan_id, kadet_id) values(now(), $1, $2) returning log_ket_id;`
-        const hasil = await db.query(query, [keterangan_id, kadet_id]);
-        console.log(hasil)
-        return ({
-            code: 200,
-            log_ket_id: hasil.rows[0].log_ket_id,
-            message: "success"
-        })
-    } catch (error) {
-        console.log(error)
         return (error.message);
     }
 }
@@ -605,7 +640,6 @@ const cekJabatan = async (akun_id) => {
             }
         }
     } catch (error) {
-        console.log(error)
         return (error.message);
     }
 }
@@ -632,107 +666,6 @@ const accessKadet = async (tingkat, yurisdiksi_id) => {
         return ({
             code: 200,
             hasil: hasil.rows
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const lapApel = async (tingkat, yurisdiksi_id, pelapor_kadet_id, jenis_apel_id) => {
-    try {
-        const query = `
-        INSERT INTO apel_${tingkat} (
-            apel_${singkat[tingkat]}_date,
-            ${tingkat}_id,
-            pelapor_kadet_id,
-            jenis_apel_id, 
-            editable) 
-        SELECT 
-            now(),
-            $1,
-            $2,
-            $3,
-            $4
-        WHERE not exists (select apel_${singkat[tingkat]}_date, jenis_apel_id from apel_${tingkat} ap where date_trunc('day',apel_${singkat[tingkat]}_date) = date_trunc('day', now()) and jenis_apel_id = $3 and ${tingkat}_id = $1) 
-        returning apel_${singkat[tingkat]}_id AS lap_apel_id;`
-        const hasil = await db.query(query, [yurisdiksi_id, pelapor_kadet_id, jenis_apel_id, 1]);
-        if (!hasil.rows[0]) {
-            return ({
-                code: 500,
-                message: 'Error Insert'
-            })
-        }
-        return ({
-            code: 200,
-            lap_apel_id: hasil.rows[0].lap_apel_id
-        })
-    } catch (error) {
-        return (error.message);
-    }
-}
-
-const sakit = async (kadet_id, sakit, detail_sakit, foto_id) => {
-    try {
-        const query = `
-        INSERT INTO sakit(
-            kadet_id,
-            sakit_nama,
-            sakit_date,
-            sakit_detail,
-            foto_id
-        ) VALUES (
-            $1, $2, now(), $3, $4
-        ) RETURNING sakit_id;`
-        const hasil = await db.query(query, [kadet_id, sakit, detail_sakit, foto_id]);
-        return ({
-            code: 200,
-            sakit_id: hasil.rows[0].sakit_id
-        })
-    } catch (error) {
-        console.log(error)
-        return (error.message);
-    }
-}
-
-const izin = async (kadet_id, izin, detail_izin, foto_id) => {
-    try {
-        const query = `
-        INSERT INTO izin(
-            kadet_id,
-            izin_nama,
-            izin_date,
-            izin_detail,
-            foto_id
-        ) VALUES (
-            $1, $2, now(), $3, $4
-        ) RETURNING izin_id;`
-        const hasil = await db.query(query, [kadet_id, izin, detail_izin, foto_id]);
-        return ({
-            code: 200,
-            izin_id: hasil.rows[0].izin_id
-        })
-    } catch (error) {
-        console.log(error)
-        return (error.message);
-    }
-}
-
-const dataApel = async (keterangan_id, kadet_id, apel_ton_id, sakit_id, izin_id) => {
-    try {
-        const query = `
-        INSERT INTO data_apel(
-            keterangan_id,
-            kadet_id,
-            apel_ton_id,
-            sakit_id,
-            izin_id
-        ) VALUES (
-            $1, $2, $3, $4, $5
-        );`
-        const hasil = await db.query(query, [keterangan_id, kadet_id, apel_ton_id, sakit_id, izin_id])
-        return ({
-            code: 200,
-            message: 'Berhasil'
         })
     } catch (error) {
         return (error.message);
@@ -766,6 +699,7 @@ const listLapApel = async (tingkat, yurisdiksi_id, add_query, add_query2) => {
             ${concat[tingkat]} as satuan,
             a.apel_${singkat[tingkat]}_id as apel_id,
             a.apel_${singkat[tingkat]}_date as apel_date,
+            a.${tingkat}_id as satuan_id,
             k.kadet_nama,
             p.pangkat_singkat,
             j.jenis_apel_id,
@@ -823,27 +757,7 @@ const listLapApel = async (tingkat, yurisdiksi_id, add_query, add_query2) => {
             lap_apel: hasil.rows
         })
     } catch (error) {
-        console.log(error)
         return (error.message);
-    }
-}
-
-const forwardApel = async (tingkat, tingkat_subordinates, apel_tingkat_id, apel_subordinates_id) => {
-    try {
-        const query = `
-        INSERT INTO ${singkat[tingkat_subordinates]}_${singkat[tingkat]}(
-            apel_${singkat[tingkat_subordinates]}_id,
-            apel_${singkat[tingkat]}_id
-        ) VALUES (
-            $1, $2
-        );`
-        const hasil = await db.query(query, [apel_subordinates_id, apel_tingkat_id])
-        return ({
-            code: 200,
-            message: 'Berhasil'
-        })
-    } catch (error) {
-        return (error);
     }
 }
 
@@ -852,6 +766,8 @@ const getDataApel = async (apel_ton_id) => {
         const query = `
             SELECT 
                 da.data_apel_id,
+                da.keterangan_id,
+                da.kadet_id,
                 k.kadet_nama,
                 concat(ton.pleton_nama, ' ', ki.kompi_nama, ' ', yon.batalyon_nama) as satuan,
                 ket.keterangan_nama,
@@ -885,7 +801,8 @@ const getSakit = async (sakit_id) => {
             SELECT 
                 s.sakit_nama,
                 s.sakit_detail,
-                f.foto_isi
+                f.foto_isi,
+                f.foto_id
             FROM sakit s
             LEFT JOIN foto f ON s.foto_id = f.foto_id
             WHERE s.sakit_id = $1
@@ -906,7 +823,8 @@ const getIzin = async (izin_id) => {
             SELECT 
                 i.izin_nama,
                 i.izin_detail,
-                f.foto_isi
+                f.foto_isi,
+                f.foto_id
             FROM izin i
             LEFT JOIN foto f ON i.foto_id = f.foto_id
             WHERE i.izin_id = $1
@@ -921,36 +839,284 @@ const getIzin = async (izin_id) => {
     }
 }
 
+const lapGiat = async (nama, detail, tanggal, foto_id, pelapor_id) => {
+    try {
+        const query = `
+        INSERT INTO lap_giat(
+            giat_date, 
+            lap_giat_date, 
+            giat_nama,
+            giat_detail,
+            pelapor_kadet_id,
+            approve,
+            foto_id
+        ) VALUES (
+            $1, now(), $2, $3, $4, $5, $6
+        ) RETURNING giat_id;`
+        const hasil = await db.query(query, [tanggal, nama, detail, pelapor_id, 0, foto_id]);
+        if (!hasil.rows[0]) {
+            return ({
+                code: 500,
+                message: 'Error Insert'
+            })
+        }
+        return ({
+            code: 200,
+            giat_id: hasil.rows[0].giat_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const getLapGiat = async (param, param_id) => {
+    try {
+        const query = `
+            SELECT 
+                l.giat_id,
+                l.giat_nama,
+                l.giat_detail,
+                l.giat_date,
+                l.lap_giat_date,
+                l.approve,
+                f.foto_isi,
+                k.kadet_nama as pelapor_nama,
+                k2.kadet_nama as approver_nama
+            FROM lap_giat l
+            LEFT JOIN foto f ON l.foto_id = f.foto_id
+            LEFT JOIN kadet k ON l.pelapor_kadet_id = k.kadet_id
+            LEFT JOIN kadet k2 ON l.approver_kadet_id = k2.kadet_id
+            WHERE l.${param} = $1
+        `
+        const hasil = await db.query(query, [param_id])
+        return ({
+            code: 200,
+            message: hasil.rows
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const dataGiat = async (giat_id, kadet_id) => {
+    try {
+        const query = `
+        INSERT INTO data_giat(
+            kadet_id,
+            giat_id
+        ) VALUES (
+            $1, $2
+        ) RETURNING data_giat_id;`
+        const hasil = await db.query(query, [kadet_id, giat_id]);
+        if (!hasil.rows[0]) {
+            return ({
+                code: 500,
+                message: 'Error Insert'
+            })
+        }
+        return ({
+            code: 200,
+            data_giat_id: hasil.rows[0].data_giat_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const getDataGiat = async (giat_id) => {
+    try {
+        const query = `
+            SELECT 
+                k.kadet_nama
+            FROM data_giat d
+            LEFT JOIN kadet k ON d.kadet_id = k.kadet_id
+            WHERE d.giat_id = $1
+        `
+        const hasil = await db.query(query, [giat_id])
+        return ({
+            code: 200,
+            message: hasil.rows
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+
+//====================================================================//
+//============================== UPDATE ==============================//
+//====================================================================//
+
+const changePassword = async (akun_id, newpassword) => {
+    try {
+        const hash = await bcrypt.hash(newpassword, 10)
+        const query = `UPDATE akun SET user_pass = $1 WHERE akun_id = $2`
+        const hasil = await db.query(query, [hash, akun_id]);
+        return ({
+            code: 200,
+            message: hasil
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const assignJabatan = async (tingkat, jabatan_id, kadet_id) => {
+    try {
+        const query = `UPDATE jabatan_${tingkat} SET kadet_id = $1 WHERE jabatan_${tingkat}_id = $2 RETURNING jabatan_${tingkat}_id AS jabatan_id`
+        const hasil = await db.query(query, [kadet_id, jabatan_id]);
+        const query2 = `INSERT INTO log_jab_${singkat[tingkat]}(log_jab_${singkat[tingkat]}_date, jabatan_${tingkat}_id, kadet_id) VALUES(now(), $1, $2) RETURNING log_jab_${singkat[tingkat]}_id`
+        const hasil2 = await db.query(query2, [hasil.rows[0].jabatan_id, kadet_id]);
+        return ({
+            code: 200,
+            message: hasil2
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const assignDinas = async (tingkat, dinas_id, kadet_id) => {
+    try {
+        const query = `UPDATE dd_${tingkat} SET kadet_id = $1 WHERE dd_${tingkat}_id = $2 RETURNING dd_${tingkat}_id AS dinas_id`
+        const hasil = await db.query(query, [kadet_id, dinas_id]);
+        const query2 = `INSERT INTO log_dd_${singkat[tingkat]}(log_dd_${singkat[tingkat]}_date, dd_${tingkat}_id, kadet_id) VALUES(now(), $1, $2) RETURNING log_dd_${singkat[tingkat]}_id`
+        const hasil2 = await db.query(query2, [hasil.rows[0].dinas_id, kadet_id]);
+        return ({
+            code: 200,
+            message: hasil2
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const editKadet = async (kadet_nim, kadet_nama, pleton_id, pangkat_id, akun_id, jenis_kelamin, angkatan) => {
+    try {
+        const query = `UPDATE kadet SET kadet_nim = $1, kadet_nama=$2, pleton_id=$3, pangkat_id=$4, jenis_kelamin=$5, angkatan=$6 WHERE akun_id = $7 RETURNING foto_id`
+        const hasil = await db.query(query, [kadet_nim, kadet_nama, pleton_id, pangkat_id, jenis_kelamin, angkatan, akun_id]);
+        return ({
+            code: 200,
+            foto_id: hasil.rows[0].foto_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const editFoto = async (foto_id, foto_isi) => {
+    try {
+        const query = `UPDATE foto SET foto_isi = $1 WHERE foto_id = $2`
+        const hasil = await db.query(query, [foto_isi, foto_id]);
+        return ({
+            code: 200,
+            message: `update foto ${foto_id} success`
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const editSakitIzin = async (sakitIzin, nama, detail, id) => {
+    try {
+        const query = `UPDATE ${sakitIzin} SET ${sakitIzin}_nama = $1, ${sakitIzin}_detail = $2  WHERE ${sakitIzin}_id = $3`
+        const hasil = await db.query(query, [nama, detail, id]);
+        return ({
+            code: 200,
+            message: `update ${sakitIzin} ${id} success`
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const editDataApel = async (data_apel_id, keterangan_id, sakit_id, izin_id) => {
+    try {
+        const query = `UPDATE data_apel SET keterangan_id = $1, sakit_id = $2, izin_id = $3 WHERE data_apel_id = $4`
+        const hasil = await db.query(query, [keterangan_id, sakit_id, izin_id, data_apel_id]);
+        return ({
+            code: 200,
+            message: `update data apel ${data_apel_id} success`
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+//====================================================================//
+//============================== DELETE ==============================//
+//====================================================================//
+
+const rollbackTambahKadet = async (foto_id, akun_id) => {
+    try {
+        const query = `DELETE FROM akun WHERE akun_id=$1`
+        const hasil = await db.query(query, [akun_id]);
+        const query2 = `DELETE FROM foto WHERE foto_id=$1`
+        const hasil2 = await db.query(query2, [foto_id]);
+        return ({
+            code: 400,
+            message: 'Gagal tambah kadet'
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const deleteEntry = async (entry, entry_id) => {
+    try {
+        const query = `DELETE FROM ${entry} WHERE ${entry}_id=$1`
+        const hasil = await db.query(query, [entry_id])
+        return ({
+            code: 400,
+            message: `${entry} ${entry_id} deleted`
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
 module.exports = {
-    login,
+    //select no params
     accounts,
     atribut,
+    kadets,
+    dds,
+    jabatans,
+    //insert
     register,
     foto,
     tambahKadet,
-    rollbackTambahKadet,
-    kadets,
-    kadet,
-    logKeterangan,
-    changePassword,
-    cekKadet,
-    editKadet,
-    editFoto,
-    tambahJabatan,
-    jabatans,
-    assignJabatan,
     tambahDD,
-    dds,
-    assignDinas,
-    cekJabatan,
-    accessKadet,
-    lapApel,
+    tambahJabatan,
+    forwardApel,
     sakit,
     izin,
     dataApel,
+    lapGiat,
+    dataGiat,
+    lapApel,
+    //select with params
+    kadet,
+    logKeterangan,
+    cekKadet,
+    login,
+    cekJabatan,
+    accessKadet,
     listLapApel,
-    forwardApel,
     getDataApel,
     getSakit,
-    getIzin
+    getIzin,
+    getLapGiat,
+    getDataGiat,
+    //update
+    changePassword,
+    assignJabatan,
+    assignDinas,
+    editKadet,
+    editFoto,
+    editSakitIzin,
+    editDataApel,
+    //delete
+    rollbackTambahKadet,
+    deleteEntry
 }

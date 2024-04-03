@@ -142,11 +142,10 @@ const assignDinas = async = async (req, res, next) => {
 
 const tambahKadet = async (req, res, next) => {
     try {
-        console.log("sampai controller")
         var akun = await Services.register(req.body.username, req.body.password, req.body.role)
-        console.log(akun)
+        
         var foto = await Services.foto(req.body.fotoUrl)
-        console.log(foto)
+        
         var result = await Services.tambahKadet(req.body.nim, req.body.nama, 1, req.body.pleton, foto.foto_id, req.body.pangkat, akun.akun_id, req.body.jk, req.body.angkatan)
         if (result.code != 200) {
             var rollback = await Services.rollbackTambahKadet(foto.foto_id, akun.akun_id)
@@ -257,7 +256,6 @@ const dataApel = async (req, res, next) => {
                         if (req.body.data[index].keterangan_id == 2) {
                             var foto = await Services.foto(req.body.data[index].foto_sakit)
                             sakit_id = (await Services.sakit(req.body.data[index].kadet_id, req.body.data[index].sakit, req.body.data[index].detail_sakit, foto.foto_id)).sakit_id
-                            console.log('sakit_id = ', sakit_id)
                         } else if (req.body.data[index].keterangan_id == 3) {
                             var foto = await Services.foto(req.body.data[index].foto_izin)
                             izin_id = (await Services.izin(req.body.data[index].kadet_id, req.body.data[index].izin, req.body.data[index].detail_izin, foto.foto_id)).izin_id
@@ -282,7 +280,6 @@ const listLapApel = async (req, res, next) => {
     try {
         var wewenang = await Services.cekJabatan(req.user.id)
         if (wewenang) {
-            console.log(wewenang.data.tingkat, wewenang.data.yurisdiksi, '', `WHERE a.${wewenang.data.tingkat}_id = $1`)
             var result = await Services.listLapApel(wewenang.data.tingkat, wewenang.data.yurisdiksi, '', `WHERE a.${wewenang.data.tingkat}_id = $1`)
             var listSub = []
             for (let index = 0; index < wewenang.data.sub_ordinates.length; index++) {
@@ -309,7 +306,6 @@ const lapApel = async (req, res, next) => {
     try {
         var wewenang = await Services.cekJabatan(req.user.id)
         if (wewenang && req.body.subordinates_lap_id[0] != null) {
-            console.log(wewenang)
             var apel = await Services.lapApel(wewenang.data.tingkat, wewenang.data.yurisdiksi, wewenang.data.kadet_id, req.body.jenis_apel)
             if (apel.lap_apel_id) {
                 for (let index = 0; index < req.body.subordinates_lap_id.length; index++) {
@@ -329,13 +325,12 @@ const lapApel = async (req, res, next) => {
 
 const apel = async (req, res, next) => {
     try {
-        console.log(req.query.tingkat, req.query.id)
         var apel_ton_id = []
         var list_data_apel = []
+        var subordinates = []
         var result = await Services.listLapApel(req.query.tingkat, req.query.id, '', `WHERE a.apel_${singkat[req.query.tingkat]}_id = $1`)
-        console.log(result)
         if (req.query.tingkat != 'pleton') {
-            console.log(subOrdinates[req.query.tingkat], req.query.id, '', `WHERE ${sambung[req.query.tingkat]}.apel_${singkat[req.query.tingkat]}_id = $1`)
+            subordinates = await Services.listLapApel(subOrdinates[req.query.tingkat], req.query.id, '', `WHERE ${sambung[req.query.tingkat]}.apel_${singkat[req.query.tingkat]}_id = $1`)
             var sub = await Services.listLapApel('pleton', req.query.id, '', `WHERE ${sambung[req.query.tingkat]}.apel_${singkat[req.query.tingkat]}_id = $1`)
             for (let index = 0; index < sub.lap_apel.length; index++) {
                 apel_ton_id.push(sub.lap_apel[index].apel_id)
@@ -343,27 +338,94 @@ const apel = async (req, res, next) => {
         } else if (req.query.tingkat == 'pleton') {
             apel_ton_id.push(result.lap_apel[0].apel_id)
         }
-        console.log('apel ton', apel_ton_id)
         for (let index = 0; index < apel_ton_id.length; index++) {
             var data_apel = await Services.getDataApel(apel_ton_id[index])
             for (let index = 0; index < data_apel.message.length; index++) {
                 if (data_apel.message[index].keterangan_nama == 'Sakit') {
                     var sakit = await Services.getSakit(data_apel.message[index].sakit_id)
                     data_apel.message[index].sakit = sakit.message
-                    console.log('sakit', sakit)
                 } else if (data_apel.message[index].keterangan_nama == 'Izin') {
                     var izin = await Services.getIzin(data_apel.message[index].izin_id)
                     data_apel.message[index].izin = izin.message
-                    console.log('izin', izin)
                 }
                 list_data_apel.push(data_apel.message[index])
             }
         }
-        console.log(list_data_apel)
         return res.status(200).send({
-            lapApel : result,
-            dataApel : list_data_apel
+            lapApel: result,
+            sub: subordinates,
+            dataApel: list_data_apel
         })
+    } catch (error) {
+        return res.status(500).send("Gangguan server")
+    }
+}
+
+const lapGiat = async (req, res, next) => {
+    try {
+        var foto = await Services.foto(req.body.foto)
+        var kadet = await Services.cekKadet(req.user.id)
+        var giat = await Services.lapGiat(req.body.nama_kegiatan, req.body.detail_kegiatan, req.body.date_kegiatan, foto.foto_id, kadet.message.kadet_id)
+        for (let index = 0; index < req.body.peserta.length; index++) {
+            var peserta = await Services.dataGiat(giat.giat_id, req.body.peserta[index].kadet_id)
+        }
+        return res.status(200).send('berhasil')
+    } catch (error) {
+        return res.status(500).send("Gangguan server")
+    }
+}
+
+const listLapGiat = async (req, res, next) => {
+    try {
+        var kadet = await Services.cekKadet(req.user.id)
+        var listLapGiat = await Services.getLapGiat('pelapor_kadet_id', kadet.message.kadet_id)
+        return res.status(200).send(listLapGiat.message)
+    } catch (error) {
+        return res.status(500).send("Gangguan server")
+    }
+}
+
+const editApel = async (req, res, next) => {
+    try {
+        console.log(req.body)
+        var wewenang = await Services.cekJabatan(req.user.id)
+        console.log(wewenang)
+        if (req.body.cek.tingkat.toLowerCase() == wewenang.data.tingkat && req.body.cek.satuan_id == wewenang.data.yurisdiksi) {
+            console.log("oke")
+            for (let index = 0; index < req.body.major.length; index++) {
+                console.log(req.body.major[index])
+                if (req.body.major[index].keterangan_id == 2) {
+                    var foto = await Services.foto(req.body.major[index].sakit.foto)
+                    var sakit = await Services.sakit(req.body.major[index].sakit.kadet_id, req.body.major[index].sakit.sakit_nama, req.body.major[index].sakit.sakit_detail, foto.foto_id)
+                    var editDataApel = await Services.editDataApel(req.body.major[index].data_apel_id, req.body.major[index].keterangan_id, sakit.sakit_id, null)
+                } else if (req.body.major[index].keterangan_id == 3) {
+                    var foto = await Services.foto(req.body.major[index].izin.foto)
+                    var izin = await Services.izin(req.body.major[index].izin.kadet_id, req.body.major[index].izin.izin_nama, req.body.major[index].izin.izin_detail, foto.foto_id)
+                    var editDataApel = await Services.editDataApel(req.body.major[index].data_apel_id, req.body.major[index].keterangan_id, null, izin.izin_id)
+                } else {
+                    var editDataApel = await Services.editDataApel(req.body.major[index].data_apel_id, req.body.major[index].keterangan_id, null, null)
+                }
+                console.log(editDataApel)
+            }
+            for (let index = 0; index < req.body.minor.sakit.length; index++) {
+                var editFoto = await Services.editFoto(req.body.minor.sakit[index].foto_id, req.body.minor.sakit[index].foto)
+                var editSakit = await Services.editSakitIzin('sakit', req.body.minor.sakit[index].sakit_nama, req.body.minor.sakit[index].sakit_detail, req.body.minor.sakit[index].sakit_id)
+            }
+            for (let index = 0; index < req.body.minor.izin.length; index++) {
+                var editFoto = await Services.editFoto(req.body.minor.izin[index].foto_id, req.body.minor.izin[index].foto)
+                var editIzin = await Services.editSakitIzin('izin', req.body.minor.izin[index].izin_nama, req.body.minor.izin[index].izin_detail, req.body.minor.izin[index].izin_id)
+            }
+            for (let index = 0; index < req.body.toDel.sakit.length; index++) {
+                var delSakit = await Services.deleteEntry('sakit', req.body.toDel.sakit[index])
+            }
+            for (let index = 0; index < req.body.toDel.izin.length; index++) {
+                var delIzin = await Services.deleteEntry('izin', req.body.toDel.izin[index])
+            }
+            for (let index = 0; index < req.body.toDel.foto.length; index++) {
+                var delFoto = await Services.deleteEntry('foto', req.body.toDel.foto[index])
+            }
+        }
+        return res.status(200).send('berhasil')
     } catch (error) {
         return res.status(500).send("Gangguan server")
     }
@@ -391,5 +453,8 @@ module.exports = {
     dataApel,
     listLapApel,
     lapApel,
-    apel
+    apel,
+    lapGiat,
+    listLapGiat,
+    editApel
 }

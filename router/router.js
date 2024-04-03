@@ -48,4 +48,10 @@ router.post('/lapApel', Auth.verifyToken, userController.lapApel)
 
 router.get('/apel', Auth.verifyToken, userController.apel)
 
+router.post('/lapGiat', Auth.verifyToken, userController.lapGiat)
+
+router.get('/listLapGiat', Auth.verifyToken, userController.listLapGiat)
+
+router.post('/editApel', Auth.verifyToken, userController.editApel)
+
 module.exports = router
