@@ -21,33 +21,33 @@ const subOrdinates = {
 
 const forward = {
     'pleton': `
-        left join ton_ki tk on tk.apel_ton_id = a.apel_ton_id
-        left join ki_yon ky on ky.apel_ki_id = tk.apel_ki_id
-        left join yon_men ym on ym.apel_yon_id = ky.apel_yon_id
+        left join apel_kompi tk on tk.apel_ki_id = a.apel_ki_id
+        left join apel_batalyon ky on ky.apel_yon_id = tk.apel_yon_id
+        left join apel_resimen ym on ym.apel_men_id = ky.apel_men_id
 
         left join pleton ton on ton.pleton_id = a.pleton_id
         left join kompi ki on ki.kompi_id = ton.kompi_id
         left join batalyon yon on yon.batalyon_id = ki.batalyon_id
     `,
     'kompi': `
-        left join ton_ki tk on tk.apel_ki_id = a.apel_ki_id
-        left join ki_yon ky on ky.apel_ki_id = a.apel_ki_id
-        left join yon_men ym on ym.apel_yon_id = ky.apel_yon_id
+        left join apel_pleton tk on tk.apel_ki_id = a.apel_ki_id
+        left join apel_batalyon ky on ky.apel_yon_id = a.apel_yon_id
+        left join apel_resimen ym on ym.apel_men_id = ky.apel_men_id
         
         left join kompi ki on ki.kompi_id = a.kompi_id
         left join batalyon yon on yon.batalyon_id = ki.batalyon_id
     `,
     'batalyon': `
-        left join yon_men ym on ym.apel_yon_id = a.apel_yon_id
-        left join ki_yon ky on ky.apel_yon_id = a.apel_yon_id 
-        left join ton_ki tk on tk.apel_ki_id = ky.apel_ki_id 
+        left join apel_resimen ym on ym.apel_men_id = a.apel_men_id
+        left join apel_kompi ky on ky.apel_yon_id = a.apel_yon_id 
+        left join apel_pleton tk on tk.apel_ki_id = ky.apel_ki_id 
         
         left join batalyon yon on yon.batalyon_id = a.batalyon_id
     `,
     'resimen': `
-        left join yon_men ym on ym.apel_men_id = a.apel_men_id
-        left join ki_yon ky on ky.apel_yon_id = ym.apel_yon_id 
-        left join ton_ki tk on tk.apel_ki_id = ky.apel_ki_id 
+        left join apel_batalyon ym on ym.apel_men_id = a.apel_men_id
+        left join apel_kompi ky on ky.apel_yon_id = ym.apel_yon_id 
+        left join apel_pleton tk on tk.apel_ki_id = ky.apel_ki_id 
         
         left join resimen men on men.resimen_id = a.resimen_id
     `
@@ -64,21 +64,19 @@ const accounts = async () => {
             a.akun_id, 
             a.username, 
             r.role_target,
-            k.kadet_nama,
-            s.status_id,
-            s.status_nama
+            a.status
         FROM 
             akun AS a 
-            LEFT JOIN role AS r ON a.role_id = r.role_id 
-            LEFT JOIN kadet AS k ON a.akun_id = k.akun_id 
-            LEFT JOIN status AS s ON a.status_id = s.status_id
+            LEFT JOIN role AS r ON a.role_id = r.role_id
         ORDER BY a.akun_id DESC`
         const user = await db.query(query)
+        console.log(user)
         return ({
             code: 200,
             message: user.rows
         })
     } catch (error) {
+        console.log(error)
         return (error.message);
     }
 }
@@ -93,9 +91,10 @@ const kadets = async () => {
             k.jenis_kelamin,
             k.angkatan,
             ket.keterangan_nama, 
-            p.pleton_nama, 
-            c.kompi_nama, 
-            b.batalyon_nama, 
+            pa.pangkat_singkat,
+            p.pleton_nama,
+            c.kompi_nama,
+            b.batalyon_nama,
             j_r.jabatan_resimen_nama, 
             j_b.jabatan_batalyon_nama, 
             j_k.jabatan_kompi_nama, 
@@ -103,12 +102,12 @@ const kadets = async () => {
             d_r.dd_resimen_nama, 
             d_b.dd_batalyon_nama, 
             d_k.dd_kompi_nama, 
-            d_p.dd_pleton_nama, 
-            pa.pangkat_singkat  
+            d_p.dd_pleton_nama
         FROM 
             kadet AS k 
             LEFT JOIN keterangan AS ket ON k.keterangan_id = ket.keterangan_id 
-            LEFT JOIN pleton AS p ON k.pleton_id = p.pleton_id 
+            LEFT JOIN pangkat AS pa ON k.pangkat_id = pa.pangkat_id
+            LEFT JOIN pleton AS p ON k.pleton_id = p.pleton_id
             LEFT JOIN kompi AS c ON p.kompi_id = c.kompi_id 
             LEFT JOIN batalyon AS b ON c.batalyon_id = b.batalyon_id 
             LEFT JOIN jabatan_resimen AS j_r ON j_r.kadet_id = k.kadet_id 
@@ -118,10 +117,9 @@ const kadets = async () => {
             LEFT JOIN dd_resimen AS d_r ON d_r.kadet_id = k.kadet_id 
             LEFT JOIN dd_batalyon AS d_b ON d_b.kadet_id = k.kadet_id 
             LEFT JOIN dd_kompi AS d_k ON d_k.kadet_id = k.kadet_id 
-            LEFT JOIN dd_pleton AS d_p ON d_p.kadet_id = k.kadet_id 
-            LEFT JOIN pangkat AS pa ON k.pangkat_id = pa.pangkat_id 
+            LEFT JOIN dd_pleton AS d_p ON d_p.kadet_id = k.kadet_id
             LEFT JOIN akun AS a ON k.akun_id = a.akun_id
-        WHERE a.status_id = 2 
+        WHERE a.status = 'Aktif' 
         ORDER BY k.kadet_nim`
         const user = await db.query(query)
         return ({
@@ -148,14 +146,13 @@ const jabatans = async () => {
                 p.pangkat_singkat, 
                 f.foto_isi, 
                 je.jenis_jabatan_nama, 
-                s.status_nama 
+                j.status
             FROM 
                 jabatan_${tingkat[index]} AS j 
                 LEFT JOIN kadet AS k ON j.kadet_id = k.kadet_id 
                 LEFT JOIN pangkat AS p ON k.pangkat_id = p.pangkat_id 
                 LEFT JOIN foto AS f ON k.foto_id = f.foto_id 
                 LEFT JOIN jenis_jabatan AS je ON j.jenis_jabatan_id = je.jenis_jabatan_id 
-                LEFT JOIN status AS s ON j.status_id = s.status_id 
                 LEFT JOIN ${tingkat[index]} AS y ON j.${tingkat[index]}_id = y.${tingkat[index]}_id
             ORDER BY j.jabatan_${tingkat[index]}_id`
             var jabatan = await db.query(query)
@@ -169,7 +166,7 @@ const jabatans = async () => {
                     pangkat: jabatan.rows[i].pangkat_singkat,
                     foto: jabatan.rows[i].foto_isi,
                     jenis: jabatan.rows[i].jenis_jabatan_nama,
-                    status: jabatan.rows[i].status_nama,
+                    status: jabatan.rows[i].status,
                     yurisdiksi_id: jabatan.rows[i].yurisdiksi_id,
                     yurisdiksi_nama: jabatan.rows[i].yurisdiksi_nama
                 })
@@ -199,14 +196,13 @@ const dds = async () => {
                 f.foto_isi, 
                 je.jenis_jabatan_nama, 
                 j.jenis_kelamin, 
-                s.status_nama 
+                j.status
             FROM 
                 dd_${tingkat[index]} AS j 
                 LEFT JOIN kadet AS k ON j.kadet_id = k.kadet_id 
                 LEFT JOIN pangkat AS p ON k.pangkat_id = p.pangkat_id 
                 LEFT JOIN foto AS f ON k.foto_id = f.foto_id 
                 LEFT JOIN jenis_jabatan AS je ON j.jenis_jabatan_id = je.jenis_jabatan_id 
-                LEFT JOIN status AS s ON j.status_id = s.status_id
             ORDER BY j.dd_${tingkat[index]}_id`
             var dd = await db.query(query)
             for (let i = 0; i < dd.rows.length; i++) {
@@ -256,10 +252,23 @@ const atribut = async () => {
 //============================== INSERT ==============================//
 //====================================================================//
 
+const aktifitas = async (akun_id, aktifitas_isi) => {
+    try {
+        const query = `INSERT INTO aktifitas(akun_id, aktifitas_date, aktifitas_isi) values($1, now(), $2) returning aktifitas_id;`
+        const hasil = await db.query(query, [akun_id, aktifitas_isi]);
+        return ({
+            code: 200,
+            aktifitas_id: hasil.rows[0].aktifitas_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
 const register = async (username, user_pass, role_id) => {
     try {
         const hash = await bcrypt.hash(user_pass, 10)
-        const query = `INSERT INTO akun(username, user_pass, role_id, status_id) values($1, $2, $3, 2) returning akun_id;`
+        const query = `INSERT INTO akun(username, user_pass, role_id, status) values($1, $2, $3, 'Aktif') returning akun_id;`
         const hasil = await db.query(query, [username, hash, role_id]);
         return ({
             code: 200,
@@ -283,10 +292,23 @@ const foto = async (fotoUrl) => {
     }
 }
 
-const tambahKadet = async (kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk, angkatan) => {
+const link = async (link) => {
     try {
-        const query = `INSERT INTO kadet(kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jenis_kelamin, angkatan) values($1, $2, $3, $4, $5, $6, $7, $8, $9) returning kadet_id;`
-        const hasil = await db.query(query, [kadet_nim, kadet_nama, keterangan_id, pleton_id, foto_id, pangkat_id, akun_id, jk, angkatan]);
+        const query = `INSERT INTO link(link_isi) values($1) returning link_id;`
+        const hasil = await db.query(query, [link]);
+        return ({
+            code: 200,
+            link_id: hasil.rows[0].link_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const tambahKadet = async (kadet_nim, kadet_nama, keterangan_id, foto_id, akun_id, jk, angkatan, pangkat_id, pleton_id) => {
+    try {
+        const query = `INSERT INTO kadet(kadet_nim, kadet_nama, keterangan_id, foto_id, akun_id, jenis_kelamin, angkatan, pangkat_id, pleton_id) values($1, $2, $3, $4, $5, $6, $7, $8, $9) returning kadet_id;`
+        const hasil = await db.query(query, [kadet_nim, kadet_nama, keterangan_id, foto_id, akun_id, jk, angkatan, pangkat_id, pleton_id]);
         return ({
             code: 200,
             kadet_id: hasil.rows[0].kadet_id,
@@ -294,6 +316,32 @@ const tambahKadet = async (kadet_nim, kadet_nama, keterangan_id, pleton_id, foto
         })
     } catch (error) {
         return (error.message);
+    }
+}
+
+const log_pangkat = async (kadet_id, pangkat_id) => {
+    try {
+        const query = `INSERT INTO log_pangkat(kadet_id, pangkat_id, log_pangkat_date) values($1, $2, now()) returning log_pangkat_id;`
+        const hasil = await db.query(query, [kadet_id, pangkat_id]);
+        return ({
+            code: 200,
+            log_pangkat_id: hasil.rows[0].log_pangkat_id
+        })
+    } catch (error) {
+        return (error.message)
+    }
+}
+
+const log_pleton = async (kadet_id, pleton_id) => {
+    try {
+        const query = `INSERT INTO log_pleton(kadet_id, pleton_id, log_pleton_date) values($1, $2, now()) returning log_pleton_id;`
+        const hasil = await db.query(query, [kadet_id, pleton_id]);
+        return ({
+            code: 200,
+            log_pleton_id: hasil.rows[0].log_pleton_id
+        })
+    } catch (error) {
+        return (error.message)
     }
 }
 
@@ -339,24 +387,30 @@ const logKeterangan = async (keterangan_id, kadet_id) => {
     }
 }
 
-const lapApel = async (tingkat, yurisdiksi_id, pelapor_kadet_id, jenis_apel_id) => {
+const lapApel = async (tingkat, yurisdiksi_id, pelapor_log_pangkat_id, pelapor_log_jab_id, pelapor_log_dd_id, jenis_apel_id) => {
     try {
+        console.log(tingkat, yurisdiksi_id, pelapor_log_pangkat_id, pelapor_log_jab_id, pelapor_log_dd_id, jenis_apel_id)
         const query = `
         INSERT INTO apel_${tingkat} (
             apel_${singkat[tingkat]}_date,
             ${tingkat}_id,
-            pelapor_kadet_id,
+            pelapor_log_pangkat_id,
+            pelapor_log_jab_${singkat[tingkat]}_id,
+            pelapor_log_dd_${singkat[tingkat]}_id,
             jenis_apel_id, 
             editable) 
-        SELECT 
+        select
             now(),
             $1,
             $2,
             $3,
-            $4
-        WHERE not exists (select apel_${singkat[tingkat]}_date, jenis_apel_id from apel_${tingkat} ap where date_trunc('day',apel_${singkat[tingkat]}_date) = date_trunc('day', now()) and jenis_apel_id = $3 and ${tingkat}_id = $1) 
+            $4,
+            $5,
+            $6
+        WHERE not exists (select apel_${singkat[tingkat]}_date, jenis_apel_id from apel_${tingkat} ap where date_trunc('day',apel_${singkat[tingkat]}_date) = date_trunc('day', now()) and jenis_apel_id = $5 and ${tingkat}_id = $1) 
         returning apel_${singkat[tingkat]}_id AS lap_apel_id;`
-        const hasil = await db.query(query, [yurisdiksi_id, pelapor_kadet_id, jenis_apel_id, 1]);
+        const hasil = await db.query(query, [yurisdiksi_id, pelapor_log_pangkat_id, pelapor_log_jab_id, pelapor_log_dd_id, jenis_apel_id, 1]);
+        console.log(hasil)
         if (!hasil.rows[0]) {
             return ({
                 code: 500,
@@ -372,11 +426,11 @@ const lapApel = async (tingkat, yurisdiksi_id, pelapor_kadet_id, jenis_apel_id) 
     }
 }
 
-const sakit = async (kadet_id, sakit, detail_sakit, foto_id) => {
+const sakit = async (data_apel_id, sakit, detail_sakit, foto_id) => {
     try {
         const query = `
         INSERT INTO sakit(
-            kadet_id,
+            data_apel_id,
             sakit_nama,
             sakit_date,
             sakit_detail,
@@ -384,21 +438,22 @@ const sakit = async (kadet_id, sakit, detail_sakit, foto_id) => {
         ) VALUES (
             $1, $2, now(), $3, $4
         ) RETURNING sakit_id;`
-        const hasil = await db.query(query, [kadet_id, sakit, detail_sakit, foto_id]);
+        const hasil = await db.query(query, [data_apel_id, sakit, detail_sakit, foto_id]);
         return ({
             code: 200,
             sakit_id: hasil.rows[0].sakit_id
         })
     } catch (error) {
+        console.log(error)
         return (error.message);
     }
 }
 
-const izin = async (kadet_id, izin, detail_izin, foto_id) => {
+const izin = async (data_apel_id, izin, detail_izin, foto_id) => {
     try {
         const query = `
         INSERT INTO izin(
-            kadet_id,
+            data_apel_id,
             izin_nama,
             izin_date,
             izin_detail,
@@ -406,54 +461,35 @@ const izin = async (kadet_id, izin, detail_izin, foto_id) => {
         ) VALUES (
             $1, $2, now(), $3, $4
         ) RETURNING izin_id;`
-        const hasil = await db.query(query, [kadet_id, izin, detail_izin, foto_id]);
+        const hasil = await db.query(query, [data_apel_id, izin, detail_izin, foto_id]);
         return ({
             code: 200,
             izin_id: hasil.rows[0].izin_id
         })
     } catch (error) {
+        console.log(error)
         return (error.message);
     }
 }
 
-const dataApel = async (keterangan_id, kadet_id, apel_ton_id, sakit_id, izin_id) => {
+const dataApel = async (keterangan_id, log_pangkat_id, apel_ton_id) => {
     try {
         const query = `
         INSERT INTO data_apel(
             keterangan_id,
-            kadet_id,
-            apel_ton_id,
-            sakit_id,
-            izin_id
+            log_pangkat_id,
+            apel_ton_id
         ) VALUES (
-            $1, $2, $3, $4, $5
-        );`
-        const hasil = await db.query(query, [keterangan_id, kadet_id, apel_ton_id, sakit_id, izin_id])
+            $1, $2, $3
+        ) returning data_apel_id;`
+        const hasil = await db.query(query, [keterangan_id, log_pangkat_id, apel_ton_id])
         return ({
             code: 200,
-            message: 'Berhasil'
+            message: hasil.rows[0].data_apel_id
         })
     } catch (error) {
+        console.log(error)
         return (error.message);
-    }
-}
-
-const forwardApel = async (tingkat, tingkat_subordinates, apel_tingkat_id, apel_subordinates_id) => {
-    try {
-        const query = `
-        INSERT INTO ${singkat[tingkat_subordinates]}_${singkat[tingkat]}(
-            apel_${singkat[tingkat_subordinates]}_id,
-            apel_${singkat[tingkat]}_id
-        ) VALUES (
-            $1, $2
-        );`
-        const hasil = await db.query(query, [apel_subordinates_id, apel_tingkat_id])
-        return ({
-            code: 200,
-            message: 'Berhasil'
-        })
-    } catch (error) {
-        return (error);
     }
 }
 
@@ -482,7 +518,8 @@ const login = async (username, password) => {
 
             return ({
                 code: 200,
-                message: token
+                message: token,
+                id: user.rows[0]['akun_id']
             })
         } else {
             return ({
@@ -514,7 +551,7 @@ const cekKadet = async (akun_id) => {
     }
 }
 
-const kadet = async (kadet_nim) => {
+const kadet = async (param, param_isi) => {
     try {
         const query = `
         SELECT 
@@ -523,7 +560,6 @@ const kadet = async (kadet_nim) => {
             k.kadet_nama, 
             k.jenis_kelamin,
             k.angkatan,
-            ket.keterangan_nama, 
             p.pleton_id, 
             p.pleton_nama, 
             c.kompi_nama, 
@@ -531,7 +567,7 @@ const kadet = async (kadet_nim) => {
             f.foto_isi, 
             pa.pangkat_id, 
             pa.pangkat_nama, 
-            s.status_nama,
+            a.status,
             jm.jabatan_resimen_nama,
             jb.jabatan_batalyon_nama,
             jk.jabatan_kompi_nama,
@@ -542,14 +578,12 @@ const kadet = async (kadet_nim) => {
             dp.dd_pleton_nama
         FROM 
             kadet AS k 
-            LEFT JOIN keterangan AS ket ON k.keterangan_id = ket.keterangan_id 
             LEFT JOIN pleton AS p ON k.pleton_id = p.pleton_id 
             LEFT JOIN kompi AS c ON p.kompi_id = c.kompi_id 
             LEFT JOIN batalyon AS b ON c.batalyon_id = b.batalyon_id 
             LEFT JOIN foto AS f ON k.foto_id=f.foto_id 
             LEFT JOIN pangkat AS pa ON k.pangkat_id=pa.pangkat_id 
             LEFT JOIN akun AS a ON k.akun_id=a.akun_id
-            LEFT JOIN status AS s ON a.status_id=s.status_id 
             LEFT JOIN jabatan_resimen AS jm ON k.kadet_id = jm.kadet_id 
             LEFT JOIN jabatan_batalyon AS jb ON k.kadet_id = jb.kadet_id 
             LEFT JOIN jabatan_kompi AS jk ON k.kadet_id = jk.kadet_id 
@@ -558,8 +592,8 @@ const kadet = async (kadet_nim) => {
             LEFT JOIN dd_batalyon AS db ON k.kadet_id = db.kadet_id 
             LEFT JOIN dd_kompi AS dk ON k.kadet_id = dk.kadet_id 
             LEFT JOIN dd_pleton AS dp ON k.kadet_id = dp.kadet_id 
-        WHERE k.kadet_nim=$1`
-        const user = await db.query(query, [kadet_nim])
+        WHERE k.${param}=$1`
+        const user = await db.query(query, [param_isi])
         return ({
             code: 200,
             message: user.rows[0]
@@ -569,15 +603,107 @@ const kadet = async (kadet_nim) => {
     }
 }
 
+const getLogPangkat = async (param, param_isi) => {
+    try {
+        const query = `
+            SELECT 
+                *
+            FROM log_pangkat
+            WHERE ${param} = $1
+            order by log_pangkat_date desc limit 1
+        `
+        const hasil = await db.query(query, [param_isi])
+        return ({
+            code: 200,
+            message: hasil.rows[0]
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const getLogPleton = async (param, param_isi) => {
+    try {
+        const query = `
+            SELECT 
+                *
+            FROM log_pleton
+            WHERE ${param} = $1
+            order by log_pleton_date desc limit 1
+        `
+        const hasil = await db.query(query, [param_isi])
+        return ({
+            code: 200,
+            message: hasil.rows[0]
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const getLogJabatan = async (tingkat, param, param_isi) => {
+    try {
+        const query = `
+            SELECT 
+                log_jab_${singkat[tingkat]}_id as log_jab_id
+            FROM log_jab_${singkat[tingkat]}
+            WHERE ${param} = $1
+            order by log_jab_${singkat[tingkat]}_date desc limit 1
+        `
+        const hasil = await db.query(query, [param_isi])
+        if (hasil.rows[0]) {
+            return ({
+                code: 200,
+                message: hasil.rows[0]
+            })
+        } else {
+            return ({
+                code: 200,
+                message: {log_jab_id:null}
+            })
+        }
+    } catch (error) {
+        return (error);
+    }
+}
+
+const getLogDinas = async (tingkat, param, param_isi) => {
+    try {
+        const query = `
+            SELECT 
+                log_dd_${singkat[tingkat]}_id as log_dd_id
+            FROM log_dd_${singkat[tingkat]}
+            WHERE ${param} = $1
+            order by log_dd_${singkat[tingkat]}_date desc limit 1
+        `
+        const hasil = await db.query(query, [param_isi])
+        if (hasil.rows[0]) {
+            return ({
+                code: 200,
+                message: hasil.rows[0]
+            })
+        } else {
+            return ({
+                code: 200,
+                message: {log_dd_id:null}
+            })
+        }
+    } catch (error) {
+        return (error);
+    }
+}
+
 const cekJabatan = async (akun_id) => {
     try {
         for (let index = 0; index < tingkat.length; index++) {
             const query1 = `
             select 
+                j.jabatan_${tingkat[index]}_id as jabordd_id,
                 j.jabatan_${tingkat[index]}_nama as jabatan, 
                 j.${tingkat[index]}_id as yurisdiksi_id,
                 k.kadet_nama,
-                k.kadet_id
+                k.kadet_id,
+                (select 'jab' as jabordd)
             from
                 jabatan_${tingkat[index]} j 
                 inner join kadet k on j.kadet_id = k.kadet_id 
@@ -601,16 +727,20 @@ const cekJabatan = async (akun_id) => {
                         kadet_id: hasil1.rows[0].kadet_id,
                         jabatan: hasil1.rows[0].jabatan,
                         yurisdiksi: hasil1.rows[0].yurisdiksi_id,
+                        jabordd: hasil1.rows[0].jabordd,
+                        jabordd_id: hasil1.rows[0].jabordd_id,
                         sub_ordinates: subordinates1.rows
                     }
                 })
             }
             const query2 = `
             select 
+                d.dd_${tingkat[index]}_id as jabordd_id, 
                 d.dd_${tingkat[index]}_nama as jabatan, 
                 d.${tingkat[index]}_id as yurisdiksi_id,
                 k.kadet_nama,
-                k.kadet_id
+                k.kadet_id,
+                (select 'dd' as jabordd)
             from
                 dd_${tingkat[index]} d 
                 inner join kadet k on d.kadet_id = k.kadet_id 
@@ -634,11 +764,35 @@ const cekJabatan = async (akun_id) => {
                         kadet_id: hasil2.rows[0].kadet_id,
                         jabatan: hasil2.rows[0].jabatan,
                         yurisdiksi: hasil2.rows[0].yurisdiksi_id,
+                        jabordd: hasil2.rows[0].jabordd,
+                        jabordd_id: hasil2.rows[0].jabordd_id,
                         sub_ordinates: subordinates2.rows
                     }
                 })
             }
         }
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const cekPejabat = async (jabordd, tingkat, satuan_id, jenis_jabatan_id) => {
+    try {
+        const query = `
+        select 
+            jab.${jabordd}_${tingkat}_id as jab_id,
+            jab.${jabordd}_${tingkat}_nama as jab_nama,
+            concat(p.pangkat_singkat, ' ', k.kadet_nama) as kadet_nama
+        from ${jabordd}_${tingkat} as jab
+        left join kadet k on jab.kadet_id = k.kadet_id
+        left join pangkat p on k.pangkat_id = p.pangkat_id
+        where jab.jenis_jabatan_id = $1 and jab.${tingkat}_id = $2
+        `
+        const hasil = await db.query(query, [jenis_jabatan_id, satuan_id]);
+        return ({
+            code: 200,
+            hasil: hasil.rows
+        })
     } catch (error) {
         return (error.message);
     }
@@ -672,7 +826,7 @@ const accessKadet = async (tingkat, yurisdiksi_id) => {
     }
 }
 
-const listLapApel = async (tingkat, yurisdiksi_id, add_query, add_query2) => {
+const listLapApel = async (tingkat, yurisdiksi_id, add_query, add_query2, add_query3) => {
     var a = 'a'
     if (tingkat != 'pleton') {
         a = 'tk'
@@ -702,16 +856,23 @@ const listLapApel = async (tingkat, yurisdiksi_id, add_query, add_query2) => {
             a.${tingkat}_id as satuan_id,
             k.kadet_nama,
             p.pangkat_singkat,
+            jab.jabatan_${tingkat}_nama as jab_nama,
+            dd.dd_${tingkat}_nama as dd_nama,
             j.jenis_apel_id,
             j.jenis_apel_nama,
             a.editable,
             sum(h.hadir) as hadir, 
-            sum(s.sakit) as sakit, 
+            sum(s.sakit) as sakit,
             sum(i.izin) as izin, 
             sum(t.tanpa_keterangan) as tanpa_keterangan
         FROM apel_${tingkat} as a
-        LEFT JOIN kadet as k ON a.pelapor_kadet_id = k.kadet_id
-        LEFT JOIN pangkat as p ON k.pangkat_id = p.pangkat_id
+        LEFT JOIN log_pangkat as lopa ON a.pelapor_log_pangkat_id = lopa.log_pangkat_id
+        LEFT JOIN kadet as k ON lopa.kadet_id = k.kadet_id
+        LEFT JOIN pangkat as p ON lopa.pangkat_id = p.pangkat_id
+        LEFT JOIN log_jab_${singkat[tingkat]} as lj ON a.pelapor_log_jab_${singkat[tingkat]}_id = lj.log_jab_${singkat[tingkat]}_id
+        LEFT JOIN jabatan_${tingkat} as jab ON lj.jabatan_${tingkat}_id = jab.jabatan_${tingkat}_id
+        LEFT JOIN log_dd_${singkat[tingkat]} as ld ON a.pelapor_log_dd_${singkat[tingkat]}_id = ld.log_dd_${singkat[tingkat]}_id
+        LEFT JOIN dd_${tingkat} as dd ON ld.dd_${tingkat}_id = dd.dd_${tingkat}_id
         LEFT JOIN jenis_apel as j ON a.jenis_apel_id = j.jenis_apel_id
         ${forward[tingkat]}
         left join (
@@ -748,8 +909,9 @@ const listLapApel = async (tingkat, yurisdiksi_id, add_query, add_query2) => {
         on ${a}.apel_ton_id = t.apel_ton_id
         ${add_query2}
         ${add_query}
-        GROUP BY a.apel_${singkat[tingkat]}_id, k.kadet_nama, p.pangkat_singkat, j.jenis_apel_id, ${concat[tingkat]}
+        GROUP BY a.apel_${singkat[tingkat]}_id, k.kadet_nama, p.pangkat_singkat, j.jenis_apel_id, ${concat[tingkat]}, jab.jabatan_${tingkat}_nama, dd.dd_${tingkat}_nama
         ORDER BY a.apel_${singkat[tingkat]}_date DESC
+        ${add_query3}
         `
         const hasil = await db.query(query, [yurisdiksi_id])
         return ({
@@ -767,21 +929,20 @@ const getDataApel = async (apel_ton_id) => {
             SELECT 
                 da.data_apel_id,
                 da.keterangan_id,
-                da.kadet_id,
                 k.kadet_nama,
+                k.kadet_id,
                 concat(ton.pleton_nama, ' ', ki.kompi_nama, ' ', yon.batalyon_nama) as satuan,
                 ket.keterangan_nama,
-                p.pangkat_singkat,
-                da.sakit_id,
-                da.izin_id
+                p.pangkat_singkat
             FROM data_apel da
             LEFT JOIN apel_pleton a ON da.apel_ton_id = a.apel_ton_id
             LEFT JOIN pleton ton ON a.pleton_id = ton.pleton_id
             LEFT JOIN kompi ki ON ton.kompi_id = ki.kompi_id
             LEFT JOIN batalyon yon ON ki.batalyon_id = yon.batalyon_id
-            LEFT JOIN kadet k ON da.kadet_id = k.kadet_id
+            LEFT JOIN log_pangkat lopa ON da.log_pangkat_id = lopa.log_pangkat_id
+            LEFT JOIN kadet k ON lopa.kadet_id = k.kadet_id
             LEFT JOIN keterangan ket ON da.keterangan_id = ket.keterangan_id
-            LEFT JOIN pangkat p ON k.pangkat_id = p.pangkat_id
+            LEFT JOIN pangkat p ON lopa.pangkat_id = p.pangkat_id
             WHERE da.apel_ton_id = $1
             ORDER BY k.kadet_nim
         `
@@ -795,19 +956,20 @@ const getDataApel = async (apel_ton_id) => {
     }
 }
 
-const getSakit = async (sakit_id) => {
+const getSakit = async (param, param_id) => {
     try {
         const query = `
             SELECT 
+                s.sakit_id,
                 s.sakit_nama,
                 s.sakit_detail,
                 f.foto_isi,
                 f.foto_id
             FROM sakit s
             LEFT JOIN foto f ON s.foto_id = f.foto_id
-            WHERE s.sakit_id = $1
+            WHERE s.${param} = $1
         `
-        const hasil = await db.query(query, [sakit_id])
+        const hasil = await db.query(query, [param_id])
         return ({
             code: 200,
             message: hasil.rows[0]
@@ -817,19 +979,20 @@ const getSakit = async (sakit_id) => {
     }
 }
 
-const getIzin = async (izin_id) => {
+const getIzin = async (param, param_id) => {
     try {
         const query = `
             SELECT 
+                i.izin_id,
                 i.izin_nama,
                 i.izin_detail,
                 f.foto_isi,
                 f.foto_id
             FROM izin i
             LEFT JOIN foto f ON i.foto_id = f.foto_id
-            WHERE i.izin_id = $1
+            WHERE i.${param} = $1
         `
-        const hasil = await db.query(query, [izin_id])
+        const hasil = await db.query(query, [param_id])
         return ({
             code: 200,
             message: hasil.rows[0]
@@ -839,7 +1002,46 @@ const getIzin = async (izin_id) => {
     }
 }
 
-const lapGiat = async (nama, detail, tanggal, foto_id, pelapor_id) => {
+const getRangkuman = async (kadet_id) => {
+    try {
+        const query = `
+        select 
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 2 and date_trunc('year',log_ket_date) = date_trunc('year',now()) ) as tahun_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 2 and date_trunc('month',log_ket_date) = date_trunc('month',now()) ) as bulan_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 2 and date_trunc('week',log_ket_date) = date_trunc('week',now()) ) as minggu_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 2) as semua
+        `
+        const sakit = await db.query(query, [kadet_id])
+        const query2 = `
+        select 
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 3 and date_trunc('year',log_ket_date) = date_trunc('year',now()) ) as tahun_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 3 and date_trunc('month',log_ket_date) = date_trunc('month',now()) ) as bulan_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 3 and date_trunc('week',log_ket_date) = date_trunc('week',now()) ) as minggu_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 3) as semua
+        `
+        const izin = await db.query(query2, [kadet_id])
+        const query3 = `
+        select 
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 4 and date_trunc('year',log_ket_date) = date_trunc('year',now()) ) as tahun_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 4 and date_trunc('month',log_ket_date) = date_trunc('month',now()) ) as bulan_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 4 and date_trunc('week',log_ket_date) = date_trunc('week',now()) ) as minggu_ini,
+            (select count(*) from log_keterangan where kadet_id = $1 and keterangan_id = 4) as semua
+        `
+        const tanpa_keterangan = await db.query(query3, [kadet_id])
+        return ({
+            code: 200,
+            message: {
+                sakit: sakit.rows[0],
+                izin: izin.rows[0],
+                tanpa_keterangan: tanpa_keterangan.rows[0]
+            }
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const lapGiat = async (nama, detail, tanggal, pelapor_log_pangkat_id) => {
     try {
         const query = `
         INSERT INTO lap_giat(
@@ -847,13 +1049,12 @@ const lapGiat = async (nama, detail, tanggal, foto_id, pelapor_id) => {
             lap_giat_date, 
             giat_nama,
             giat_detail,
-            pelapor_kadet_id,
-            approve,
-            foto_id
+            pelapor_log_pangkat_id,
+            approve
         ) VALUES (
-            $1, now(), $2, $3, $4, $5, $6
+            $1, now(), $2, $3, $4, $5
         ) RETURNING giat_id;`
-        const hasil = await db.query(query, [tanggal, nama, detail, pelapor_id, 0, foto_id]);
+        const hasil = await db.query(query, [tanggal, nama, detail, pelapor_log_pangkat_id, 0]);
         if (!hasil.rows[0]) {
             return ({
                 code: 500,
@@ -879,14 +1080,29 @@ const getLapGiat = async (param, param_id) => {
                 l.giat_date,
                 l.lap_giat_date,
                 l.approve,
-                f.foto_isi,
-                k.kadet_nama as pelapor_nama,
-                k2.kadet_nama as approver_nama
+                concat(p.pangkat_singkat, ' ', k.kadet_nama) pelapor_nama,
+                concat(p2.pangkat_singkat, ' ', k2.kadet_nama) approver_jab_kadet_nama,
+                jr.jabatan_resimen_nama,
+                concat(p3.pangkat_singkat, ' ', k3.kadet_nama) approver_dd_kadet_nama,
+                dr.dd_resimen_nama
             FROM lap_giat l
-            LEFT JOIN foto f ON l.foto_id = f.foto_id
-            LEFT JOIN kadet k ON l.pelapor_kadet_id = k.kadet_id
-            LEFT JOIN kadet k2 ON l.approver_kadet_id = k2.kadet_id
-            WHERE l.${param} = $1
+            LEFT JOIN log_pangkat lopa ON l.pelapor_log_pangkat_id = lopa.log_pangkat_id
+            LEFT JOIN kadet k ON lopa.kadet_id = k.kadet_id
+            LEFT JOIN pangkat p ON lopa.pangkat_id = p.pangkat_id
+
+            LEFT JOIN log_jab_men ljm ON l.approver_log_jab_men_id = ljm.log_jab_men_id
+            LEFT JOIN jabatan_resimen jr ON ljm.jabatan_resimen_id = jr.jabatan_resimen_id
+            LEFT JOIN log_pangkat lopa2 ON ljm.log_pangkat_id = lopa2.log_pangkat_id
+            LEFT JOIN kadet k2 ON lopa2.kadet_id = k2.kadet_id
+            LEFT JOIN pangkat p2 ON lopa2.pangkat_id = p2.pangkat_id
+
+            LEFT JOIN log_dd_men ldm ON l.approver_log_dd_men_id = ldm.log_dd_men_id
+            LEFT JOIN dd_resimen dr ON ldm.dd_resimen_id = dr.dd_resimen_id
+            LEFT JOIN log_pangkat lopa3 ON ldm.log_pangkat_id = lopa3.log_pangkat_id
+            LEFT JOIN kadet k3 ON lopa3.kadet_id = k3.kadet_id
+            LEFT JOIN pangkat p3 ON lopa3.pangkat_id = p3.pangkat_id
+            WHERE ${param} = $1
+            order by l.lap_giat_date desc
         `
         const hasil = await db.query(query, [param_id])
         return ({
@@ -898,16 +1114,17 @@ const getLapGiat = async (param, param_id) => {
     }
 }
 
-const dataGiat = async (giat_id, kadet_id) => {
+const dataGiat = async (giat_id, log_pangkat_id, log_pleton_id) => {
     try {
         const query = `
         INSERT INTO data_giat(
-            kadet_id,
+            log_pangkat_id, 
+            log_pleton_id,
             giat_id
         ) VALUES (
-            $1, $2
+            $1, $2, $3
         ) RETURNING data_giat_id;`
-        const hasil = await db.query(query, [kadet_id, giat_id]);
+        const hasil = await db.query(query, [log_pangkat_id, log_pleton_id, giat_id]);
         if (!hasil.rows[0]) {
             return ({
                 code: 500,
@@ -923,16 +1140,74 @@ const dataGiat = async (giat_id, kadet_id) => {
     }
 }
 
-const getDataGiat = async (giat_id) => {
+const foto_giat = async (giat_id, foto_id) => {
+    try {
+        const query = `
+        INSERT INTO foto_giat(
+            giat_id,
+            foto_id
+        ) VALUES (
+            $1, $2
+        ) RETURNING foto_giat_id;`
+        const hasil = await db.query(query, [giat_id, foto_id]);
+        if (!hasil.rows[0]) {
+            return ({
+                code: 500,
+                message: 'Error Insert'
+            })
+        }
+        return ({
+            code: 200,
+            foto_giat_id: hasil.rows[0].foto_giat_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const attachment_giat = async (giat_id, link_id) => {
+    try {
+        const query = `
+        INSERT INTO attachment_giat(
+            giat_id,
+            link_id
+        ) VALUES (
+            $1, $2
+        ) RETURNING attachment_giat_id;`
+        const hasil = await db.query(query, [giat_id, link_id]);
+        if (!hasil.rows[0]) {
+            return ({
+                code: 500,
+                message: 'Error Insert'
+            })
+        }
+        return ({
+            code: 200,
+            attachment_giat_id: hasil.rows[0].attachment_giat_id
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const getDataGiat = async (param, param_id) => {
     try {
         const query = `
             SELECT 
-                k.kadet_nama
+                d.giat_id,
+                concat(p.pangkat_singkat, ' ', k.kadet_nama) kadet_nama,
+                concat(ton.pleton_nama, ' ', ki.kompi_nama, ' ', yon.batalyon_nama) pleton
             FROM data_giat d
-            LEFT JOIN kadet k ON d.kadet_id = k.kadet_id
-            WHERE d.giat_id = $1
+            LEFT JOIN log_pangkat lopa ON d.log_pangkat_id = lopa.log_pangkat_id
+            LEFT JOIN log_pleton lopl ON d.log_pleton_id = lopl.log_pleton_id
+            LEFT JOIN kadet k ON lopa.kadet_id = k.kadet_id
+            LEFT JOIN pangkat p ON lopa.pangkat_id = p.pangkat_id
+            left join pleton ton on ton.pleton_id = lopl.pleton_id
+            left join kompi ki on ki.kompi_id = ton.kompi_id
+            left join batalyon yon on yon.batalyon_id = ki.batalyon_id
+            WHERE d.${param} = $1
         `
-        const hasil = await db.query(query, [giat_id])
+        const hasil = await db.query(query, [param_id])
         return ({
             code: 200,
             message: hasil.rows
@@ -942,6 +1217,93 @@ const getDataGiat = async (giat_id) => {
     }
 }
 
+const getFotoGiat = async (param, param_id) => {
+    try {
+        const query = `
+            SELECT 
+                f.foto_giat_id,
+                f2.foto_isi
+            FROM foto_giat f
+            INNER JOIN foto f2 ON f.foto_id = f2.foto_id
+            WHERE f.${param} = $1
+        `
+        const hasil = await db.query(query, [param_id])
+        return ({
+            code: 200,
+            message: hasil.rows
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const getAttachmentGiat = async (param, param_id) => {
+    try {
+        const query = `
+            SELECT 
+                a.attachment_giat_id,
+                l.link_isi
+            FROM attachment_giat a
+            INNER JOIN link l ON a.link_id = l.link_id
+            WHERE a.${param} = $1
+        `
+        const hasil = await db.query(query, [param_id])
+        return ({
+            code: 200,
+            message: hasil.rows
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const getKadetRiwayatApel = async (kadet_nim, limit) => {
+    try {
+        const query = `
+        select
+            da.data_apel_id,
+            k.kadet_nama,
+            k2.keterangan_nama,
+            ja.jenis_apel_nama,
+            ar.apel_men_date,
+            ar.apel_men_id 
+        from data_apel da
+        left join log_pangkat lopa on da.log_pangkat_id = lopa.log_pangkat_id
+        left join kadet k on lopa.kadet_id = k.kadet_id
+        left join keterangan k2 on da.keterangan_id = k2.keterangan_id
+        inner join apel_pleton ap on da.apel_ton_id = ap.apel_ton_id
+        inner join apel_kompi ak on ap.apel_ki_id = ak.apel_ki_id 
+        inner join apel_batalyon ab on ak.apel_yon_id = ab.apel_yon_id 
+        inner join apel_resimen ar on ab.apel_men_id = ar.apel_men_id 
+        left join jenis_apel ja on ap.jenis_apel_id = ja.jenis_apel_id
+        where k.kadet_nim = $1
+        order by da.data_apel_id desc
+        limit $2
+        `
+        const hasil = await db.query(query, [kadet_nim, limit])
+        return ({
+            code: 200,
+            message: hasil.rows
+        })
+    } catch (error) {
+        return (error);
+    }
+}
+
+const getAktifitas = async () => {
+    try {
+        const query = `
+        select a2.username, a.aktifitas_isi, a.aktifitas_date  from aktifitas a inner join akun a2 on a.akun_id = a2.akun_id order by a.aktifitas_date desc limit 10
+        `
+        const hasil = await db.query(query)
+        return ({
+            code: 200,
+            message: hasil.rows
+        })
+    } catch (error) {
+        return (error);
+    }
+}
 
 //====================================================================//
 //============================== UPDATE ==============================//
@@ -961,27 +1323,30 @@ const changePassword = async (akun_id, newpassword) => {
     }
 }
 
-const assignJabatan = async (tingkat, jabatan_id, kadet_id) => {
+const assignJabatan = async (tingkat, jabatan_id, kadet_id, log_pangkat_id) => {
     try {
         const query = `UPDATE jabatan_${tingkat} SET kadet_id = $1 WHERE jabatan_${tingkat}_id = $2 RETURNING jabatan_${tingkat}_id AS jabatan_id`
         const hasil = await db.query(query, [kadet_id, jabatan_id]);
-        const query2 = `INSERT INTO log_jab_${singkat[tingkat]}(log_jab_${singkat[tingkat]}_date, jabatan_${tingkat}_id, kadet_id) VALUES(now(), $1, $2) RETURNING log_jab_${singkat[tingkat]}_id`
-        const hasil2 = await db.query(query2, [hasil.rows[0].jabatan_id, kadet_id]);
+        console.log(hasil)
+        const query2 = `INSERT INTO log_jab_${singkat[tingkat]}(log_jab_${singkat[tingkat]}_date, jabatan_${tingkat}_id, log_pangkat_id) VALUES(now(), $1, $2) RETURNING log_jab_${singkat[tingkat]}_id`
+        const hasil2 = await db.query(query2, [jabatan_id, log_pangkat_id]);
+        console.log(hasil2)
         return ({
             code: 200,
             message: hasil2
         })
     } catch (error) {
+        console.log(error)
         return (error.message);
     }
 }
 
-const assignDinas = async (tingkat, dinas_id, kadet_id) => {
+const assignDinas = async (tingkat, dinas_id, kadet_id, log_pangkat_id) => {
     try {
         const query = `UPDATE dd_${tingkat} SET kadet_id = $1 WHERE dd_${tingkat}_id = $2 RETURNING dd_${tingkat}_id AS dinas_id`
         const hasil = await db.query(query, [kadet_id, dinas_id]);
-        const query2 = `INSERT INTO log_dd_${singkat[tingkat]}(log_dd_${singkat[tingkat]}_date, dd_${tingkat}_id, kadet_id) VALUES(now(), $1, $2) RETURNING log_dd_${singkat[tingkat]}_id`
-        const hasil2 = await db.query(query2, [hasil.rows[0].dinas_id, kadet_id]);
+        const query2 = `INSERT INTO log_dd_${singkat[tingkat]}(log_dd_${singkat[tingkat]}_date, dd_${tingkat}_id, log_pangkat_id) VALUES(now(), $1, $2) RETURNING log_dd_${singkat[tingkat]}_id`
+        const hasil2 = await db.query(query2, [dinas_id, log_pangkat_id]);
         return ({
             code: 200,
             message: hasil2
@@ -1030,16 +1395,58 @@ const editSakitIzin = async (sakitIzin, nama, detail, id) => {
     }
 }
 
-const editDataApel = async (data_apel_id, keterangan_id, sakit_id, izin_id) => {
+const editDataApel = async (data_apel_id, keterangan_id) => {
     try {
-        const query = `UPDATE data_apel SET keterangan_id = $1, sakit_id = $2, izin_id = $3 WHERE data_apel_id = $4`
-        const hasil = await db.query(query, [keterangan_id, sakit_id, izin_id, data_apel_id]);
+        const query = `UPDATE data_apel SET keterangan_id = $1 WHERE data_apel_id = $2`
+        const hasil = await db.query(query, [keterangan_id, data_apel_id]);
         return ({
             code: 200,
             message: `update data apel ${data_apel_id} success`
         })
     } catch (error) {
         return (error.message);
+    }
+}
+
+const updateKeterangan = async (kadet_id, keterangan_id) => {
+    try {
+        const query = `UPDATE kadet SET keterangan_id = $1 WHERE kadet_id = $2`
+        const hasil = await db.query(query, [keterangan_id, kadet_id]);
+        return ({
+            code: 200,
+            message: `update keterangan success`
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const approveGiat = async (giat_id, param, param_id) => {
+    try {
+        const query = `UPDATE lap_giat SET approve = $1, approver_${param} = $2 WHERE giat_id = $3`
+        const hasil = await db.query(query, ["1", param_id, giat_id]);
+        console.log(hasil)
+        return ({
+            code: 200,
+            message: `approve success`
+        })
+    } catch (error) {
+        return (error.message);
+    }
+}
+
+const forwardApel = async (tingkat, tingkat_subordinates, apel_tingkat_id, apel_subordinates_id) => {
+    try {
+        const query = `
+        UPDATE apel_${tingkat_subordinates} SET apel_${singkat[tingkat]}_id = $1, editable = '0' WHERE apel_${singkat[tingkat_subordinates]}_id = $2
+        `
+        const hasil = await db.query(query, [apel_tingkat_id, apel_subordinates_id])
+        return ({
+            code: 200,
+            message: 'Berhasil'
+        })
+    } catch (error) {
+        return (error);
     }
 }
 
@@ -1085,22 +1492,28 @@ module.exports = {
     //insert
     register,
     foto,
+    link,
     tambahKadet,
     tambahDD,
     tambahJabatan,
-    forwardApel,
     sakit,
     izin,
     dataApel,
     lapGiat,
     dataGiat,
     lapApel,
+    aktifitas,
+    log_pangkat,
+    log_pleton,
+    foto_giat,
+    attachment_giat,
     //select with params
     kadet,
     logKeterangan,
     cekKadet,
     login,
     cekJabatan,
+    cekPejabat,
     accessKadet,
     listLapApel,
     getDataApel,
@@ -1108,6 +1521,15 @@ module.exports = {
     getIzin,
     getLapGiat,
     getDataGiat,
+    getKadetRiwayatApel,
+    getRangkuman,
+    getAktifitas,
+    getLogPangkat,
+    getLogPleton,
+    getLogJabatan,
+    getLogDinas,
+    getFotoGiat,
+    getAttachmentGiat,
     //update
     changePassword,
     assignJabatan,
@@ -1116,6 +1538,9 @@ module.exports = {
     editFoto,
     editSakitIzin,
     editDataApel,
+    forwardApel,
+    updateKeterangan,
+    approveGiat,
     //delete
     rollbackTambahKadet,
     deleteEntry

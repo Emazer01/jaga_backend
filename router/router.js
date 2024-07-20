@@ -10,17 +10,17 @@ router.get('/verify', Auth.verifyToken, userController.verify)
 
 router.get('/atribut', Auth.verifyToken, userController.atribut)
 
-router.get('/kadets', Auth.verifyToken, userController.kadets)
+router.get('/kadet/all', Auth.verifyToken, userController.kadets)
 
-router.get('/kadet', Auth.verifyToken, userController.kadet)
+router.get('/kadet/detail', Auth.verifyToken, userController.kadet)
 
-router.get('/mykadet', Auth.verifyToken, userController.myKadet)
+router.get('/kadet/my', Auth.verifyToken, userController.myKadet)
 
 router.get('/accounts', Auth.verifyToken, Auth.verifyAdmin, userController.accounts)
 
-router.post('/tambahKadet', Auth.verifyToken, Auth.verifyAdmin, Validation.register, userController.tambahKadet)
+router.post('/accounts/addKadet', Auth.verifyToken, Auth.verifyAdmin, Validation.register, userController.tambahKadet)
 
-router.post('/tambahAkun', Auth.verifyToken, Auth.verifyAdmin, Validation.register, userController.tambahAkun)
+router.post('/accounts/add', Auth.verifyToken, Auth.verifyAdmin, Validation.register, userController.tambahAkun)
 
 router.post('/tambahJabatan', Auth.verifyToken, Auth.verifyAdmin, userController.tambahJabatan)
 
@@ -34,24 +34,32 @@ router.get('/jabatans', Auth.verifyToken, userController.jabatans)
 
 router.get('/dds', Auth.verifyToken, userController.dds)
 
-router.put('/assignJabatan', Auth.verifyToken, Auth.verifyAdmin, userController.assignJabatan)
+router.put('/jabatans/assign', Auth.verifyToken, Auth.verifyAdmin, userController.assignJabatan)
 
-router.put('/assignDinas', Auth.verifyToken, Auth.verifyAdmin, userController.assignDinas)
+router.put('/dds/assign', Auth.verifyToken, Auth.verifyAdmin, userController.assignDinas)
 
 router.get('/wewenang', Auth.verifyToken, userController.wewenang)
 
-router.post('/dataApel', Auth.verifyToken, userController.dataApel)
+router.post('/laporan/apel/create', Auth.verifyToken, userController.dataApel)
 
-router.get('/listLapApel', Auth.verifyToken, userController.listLapApel)
+router.get('/laporan/apel', Auth.verifyToken, userController.listLapApel)
 
-router.post('/lapApel', Auth.verifyToken, userController.lapApel)
+router.post('/laporan/apel/forward', Auth.verifyToken, userController.lapApel)
 
-router.get('/apel', Auth.verifyToken, userController.apel)
+router.get('/laporan/apel/detail', Auth.verifyToken, userController.apel)
 
-router.post('/lapGiat', Auth.verifyToken, userController.lapGiat)
+router.post('/laporan/apel/edit', Auth.verifyToken, userController.editApel)
 
-router.get('/listLapGiat', Auth.verifyToken, userController.listLapGiat)
+router.post('/laporan/giat/create', Auth.verifyToken, userController.lapGiat)
 
-router.post('/editApel', Auth.verifyToken, userController.editApel)
+router.put('/approveGiat', Auth.verifyToken, userController.approveGiat)
+
+router.get('/laporan/giat', Auth.verifyToken, userController.listLapGiat)
+
+router.get('/giat', Auth.verifyToken, userController.giat)
+
+router.get('/listUnapprovedGiat', Auth.verifyToken, userController.listUnapprovedGiat)
+
+router.get('/trends', Auth.verifyToken, userController.trends)
 
 module.exports = router
